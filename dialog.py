@@ -547,8 +547,7 @@ class GeoDataForgeDialog(QDialog):
         layers = QgsProject.instance().mapLayers().values()
         poly_layers = [
             lay for lay in layers
-            if lay.type() == QgsMapLayer.VectorLayer
-            and lay.geometryType() == QgsWkbTypes.PolygonGeometry
+            if lay.type() == QgsMapLayer.VectorLayer and lay.geometryType() == QgsWkbTypes.PolygonGeometry
         ]
 
         if poly_layers:
@@ -930,7 +929,7 @@ class GeoDataForgeDialog(QDialog):
             extent_height = abs(ymax - ymin)
             approx_area = round(extent_width * extent_height, 4)
             unit_suffix = "deg²" if crs_str == "EPSG:4326" else "m²"
-            
+
             # Simple avg distance bounds estimation
             avg_dist = 0
             if len(geometries) > 1:
@@ -1094,7 +1093,7 @@ class GeoDataForgeDialog(QDialog):
                 if normalized_output in uri or output_path.lower() in uri:
                     layers_to_remove.append(layer.id())
         if layers_to_remove:
-            self.log(f"Releasing file lock: Unloading layer from layers list...")
+            self.log("Releasing file lock: Unloading layer from layers list...")
             QgsProject.instance().removeMapLayers(layers_to_remove)
 
         try:
@@ -1125,10 +1124,10 @@ class GeoDataForgeDialog(QDialog):
             # Generate structured HTML Report and README.txt explanations alongside data
             base_dir = os.path.dirname(output_path)
             base_name = os.path.splitext(os.path.basename(output_path))[0]
-            
+
             readme_path = os.path.join(base_dir, f"{base_name}_README.txt")
             report_path = os.path.join(base_dir, f"{base_name}_report.html")
-            
+
             # 1. Write explanation README
             readme_content = f"""Dataset Name:
 {layer_name}
@@ -1148,10 +1147,10 @@ Generated Schema Fields:
 """
             for field in schema:
                 readme_content += f"  • {field['name']}: Type {field['type']}\n"
-            
+
             with open(readme_path, "w", encoding="utf-8") as rf:
                 rf.write(readme_content)
-            
+
             # 2. Write HTML report
             breakdown_rows = "".join([f"<tr><td>{k}</td><td><b>{v}/25</b></td></tr>" for k, v in breakdown.items()])
             html_content = f"""<!DOCTYPE html>
@@ -1189,7 +1188,7 @@ Generated Schema Fields:
             <div class="metric"><span>Spatial Layout</span><b>{self.selected_distribution}</b></div>
             <div class="metric"><span>Output Format</span><b>{fmt_desc}</b></div>
         </div>
-        
+
         <h2>Validation Breakdown</h2>
         <table>
             <thead>
@@ -1273,7 +1272,7 @@ Generated Schema Fields:
             duration = round(time.time() - self.start_time, 2)
             user_dir = os.path.expanduser("~")
             telemetry_path = os.path.join(user_dir, ".geodata_forge_telemetry.json")
-            
+
             stats = {"total_opens": 0, "total_seconds_spent": 0.0, "sessions": []}
             if os.path.exists(telemetry_path):
                 with open(telemetry_path, "r", encoding="utf-8") as f:
@@ -1281,17 +1280,17 @@ Generated Schema Fields:
                         stats = json.load(f)
                     except Exception:
                         pass
-            
+
             stats["total_opens"] += 1
             stats["total_seconds_spent"] = round(stats.get("total_seconds_spent", 0.0) + duration, 2)
             stats["sessions"].append({
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "duration_seconds": duration
             })
-            
+
             # Keep only last 50 session history logs
             stats["sessions"] = stats["sessions"][-50:]
-            
+
             with open(telemetry_path, "w", encoding="utf-8") as f:
                 json.dump(stats, f, indent=4)
         except Exception:
@@ -1410,7 +1409,7 @@ def build_geojson():
     features = []
     for i in range(len(points)):
         x, y = points[i]
-        
+
         # Build valid geometry structure based on selected type
         if GEOM_TYPE == "Point":
             geom_struct = {{
@@ -1456,4 +1455,3 @@ if __name__ == "__main__":
         except Exception as e:
             QMessageBox.critical(self, "Export Script Error", f"Failed to save automation script: {str(e)}")
             self.log(f"ERROR: Script export failed: {str(e)}")
-

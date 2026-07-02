@@ -1,78 +1,122 @@
 # -*- coding: utf-8 -*-
 """Unit tests for GeoData Forge spatial, attribute, validation, and JSON profile math."""
+import json
 import os
 import sys
 import tempfile
 import types
 import unittest
 
-# 1. Inject QGIS mock modules into sys.modules for offline test capabilities
+
+# =============================================================================
+# QGIS mock classes and objects for running tests outside QGIS environment
+# =============================================================================
+
 class MockPointXY:
+
     def __init__(self, x, y):
         self._x = x
         self._y = y
-    def x(self): return self._x
-    def y(self): return self._y
-    def __repr__(self): return f"Point({self._x}, {self._y})"
+
+    def x(self):
+        return self._x
+
+    def y(self):
+        return self._y
+
+    def __repr__(self):
+        return f"Point({self._x}, {self._y})"
+
 
 class MockGeometry:
+
     @staticmethod
     def fromPointXY(pt):
         return MockGeometry(pt)
+
     @staticmethod
     def fromWkt(wkt):
         return MockGeometry(None)
+
     @staticmethod
     def fromMultiPointXY(pts):
         return MockGeometry(None)
+
     @staticmethod
     def fromRect(rect):
         return MockGeometry(None)
+
     @staticmethod
     def fromPolygonXY(rings):
         return MockGeometry(None)
+
     def __init__(self, pt):
         self.pt = pt
+
     def contains(self, other):
         return True
+
     def isGeosValid(self):
         return True
+
     def isNull(self):
         return False
+
     def isEmpty(self):
         return False
+
     def type(self):
         from qgis.core import QgsWkbTypes
         return QgsWkbTypes.PolygonGeometry
+
     def voronoiDiagram(self, extent):
         return MockGeometry(None)
+
     def asGeometryCollection(self):
         return [MockGeometry(None), MockGeometry(None), MockGeometry(None)]
+
     def boundingBox(self):
         return MockRectangle(0, 0, 100, 100)
+
     def intersection(self, other):
         return MockGeometry(None)
+
     def asJson(self):
         return '{"type": "Point", "coordinates": [0.0, 0.0]}'
 
+
 class MockRectangle:
+
     def __init__(self, xmin, ymin, xmax, ymax):
         self._xmin = xmin
         self._ymin = ymin
         self._xmax = xmax
         self._ymax = ymax
-    def xMinimum(self): return self._xmin
-    def yMinimum(self): return self._ymin
-    def xMaximum(self): return self._xmax
-    def yMaximum(self): return self._ymax
+
+    def xMinimum(self):
+        return self._xmin
+
+    def yMinimum(self):
+        return self._ymin
+
+    def xMaximum(self):
+        return self._xmax
+
+    def yMaximum(self):
+        return self._ymax
+
 
 class MockLineString:
+
     def __init__(self, points):
         self.points = points
 
+
 class MockPolygon:
+
     def __init__(self):
         pass
+
 
 class MockWkbTypes:
     Point = 1
@@ -80,55 +124,77 @@ class MockWkbTypes:
     Polygon = 3
     PolygonGeometry = 3
 
+
 class MockCoordinateReferenceSystem:
+
     def __init__(self, authid):
         self.authid = authid
+
     def isValid(self):
         return self.authid.startswith("EPSG:")
+
     def isGeographic(self):
         return self.authid == "EPSG:4326"
 
+
 class MockFields:
+
     def __init__(self):
         self.fields = []
+
     def append(self, f):
         self.fields.append(f)
 
+
 class MockField:
+
     def __init__(self, name, q_type):
         self.name = name
         self.q_type = q_type
 
+
 class MockFeature:
+
     def __init__(self, fields=None):
         self.fields = fields
         self.geom = None
         self.attribs = {}
+
     def setGeometry(self, geom):
         self.geom = geom
+
     def setAttribute(self, key, val):
         self.attribs[key] = val
 
+
 class MockProject:
+
     @staticmethod
     def instance():
         return MockProject()
+
     def transformContext(self):
         return None
+
 
 class MockVectorFileWriter:
     NoError = 0
     SaveVectorOptions = type('SaveVectorOptions', (), {})
     CreateOrOverwriteFile = 1
+
     @staticmethod
     def create(path, fields, geometry_type, crs, transform_context, options):
         return MockVectorFileWriter()
+
     def hasError(self):
         return 0
+
     def errorMessage(self):
         return ""
+
     def addFeature(self, f):
         pass
+
 
 # Mock the modules
 qgis_core = types.ModuleType('qgis.core')
@@ -230,7 +296,9 @@ class TestAttributeGenerator(unittest.TestCase):
             {"name": "dbh_cm", "type": "Numeric", "min": 5, "max": 120},
             {"name": "height_m", "type": "Numeric", "min": 2, "max": 50}
         ]
-        rows = AttributeGenerator.generate_attributes(self.count, self.seed, schema, "forestry")
+        rows = AttributeGenerator.generate_attributes(
+            self.count, self.seed, schema, "forestry"
+        )
         self.assertEqual(len(rows), self.count)
         for r in rows:
             self.assertIn("species_scientific", r)
@@ -255,7 +323,9 @@ class TestValidator(unittest.TestCase):
     def test_quality_scoring(self):
         schema = [{"name": "parcel_id", "type": "SequentialID"}]
         features = [(MockGeometry(None), {"parcel_id": 1})]
-        score, breakdown = Validator.compute_quality_score(features, schema, 1, "EPSG:4326")
+        score, breakdown = Validator.compute_quality_score(
+            features, schema, 1, "EPSG:4326"
+        )
         self.assertEqual(score, 100)
         self.assertEqual(breakdown["Geometry valid"], 25)
 
@@ -287,14 +357,20 @@ class TestExporter(unittest.TestCase):
 
     def tearDown(self):
         import shutil
-        shutil.rmtree(self.temp_dir)
+        if os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir)
 
     def test_export_to_geojson_file(self):
         path = os.path.join(self.temp_dir, "test.geojson")
-        schema = [{"name": "id", "type": "SequentialID"}]
-        features = [(MockGeometry(None), {"id": 1})]
+        schema = [{"name": "parcel_id", "type": "SequentialID"}]
+        features = [(MockGeometry(None), {"parcel_id": 1})]
         Exporter.export_to_geojson(path, schema, features)
         self.assertTrue(os.path.exists(path))
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            self.assertEqual(data["type"], "FeatureCollection")
+            self.assertEqual(len(data["features"]), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

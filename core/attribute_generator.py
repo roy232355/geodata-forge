@@ -9,36 +9,36 @@ import random
 # =============================================================================
 
 SPECIES_PROFILES = {
-    "Pinus sylvestris":   {"height_m": (15, 35), "dbh_cm": (20, 80),  "age_years": (20, 200)},
-    "Quercus robur":      {"height_m": (20, 40), "dbh_cm": (30, 120), "age_years": (50, 500)},
-    "Betula pendula":     {"height_m": (10, 25), "dbh_cm": (10, 40),  "age_years": (10, 80)},
-    "Picea abies":        {"height_m": (20, 55), "dbh_cm": (20, 90),  "age_years": (30, 300)},
-    "Fagus sylvatica":    {"height_m": (25, 45), "dbh_cm": (30, 150), "age_years": (50, 400)},
-    "Acer platanoides":   {"height_m": (12, 25), "dbh_cm": (15, 60),  "age_years": (20, 120)},
-    "Fraxinus excelsior": {"height_m": (15, 35), "dbh_cm": (20, 80),  "age_years": (30, 200)},
-    "Larix decidua":      {"height_m": (20, 50), "dbh_cm": (20, 100), "age_years": (30, 400)},
-    "Populus tremula":    {"height_m": (10, 25), "dbh_cm": (10, 40),  "age_years": (10, 60)},
-    "Alnus glutinosa":    {"height_m": (10, 30), "dbh_cm": (10, 50),  "age_years": (10, 100)},
-    "Tilia cordata":      {"height_m": (15, 30), "dbh_cm": (20, 80),  "age_years": (30, 300)},
-    "Ulmus glabra":       {"height_m": (15, 35), "dbh_cm": (20, 90),  "age_years": (30, 250)},
+    "Pinus sylvestris": {"height_m": (15, 35), "dbh_cm": (20, 80), "age_years": (20, 200)},
+    "Quercus robur": {"height_m": (20, 40), "dbh_cm": (30, 120), "age_years": (50, 500)},
+    "Betula pendula": {"height_m": (10, 25), "dbh_cm": (10, 40), "age_years": (10, 80)},
+    "Picea abies": {"height_m": (20, 55), "dbh_cm": (20, 90), "age_years": (30, 300)},
+    "Fagus sylvatica": {"height_m": (25, 45), "dbh_cm": (30, 150), "age_years": (50, 400)},
+    "Acer platanoides": {"height_m": (12, 25), "dbh_cm": (15, 60), "age_years": (20, 120)},
+    "Fraxinus excelsior": {"height_m": (15, 35), "dbh_cm": (20, 80), "age_years": (30, 200)},
+    "Larix decidua": {"height_m": (20, 50), "dbh_cm": (20, 100), "age_years": (30, 400)},
+    "Populus tremula": {"height_m": (10, 25), "dbh_cm": (10, 40), "age_years": (10, 60)},
+    "Alnus glutinosa": {"height_m": (10, 30), "dbh_cm": (10, 50), "age_years": (10, 100)},
+    "Tilia cordata": {"height_m": (15, 30), "dbh_cm": (20, 80), "age_years": (30, 300)},
+    "Ulmus glabra": {"height_m": (15, 35), "dbh_cm": (20, 90), "age_years": (30, 250)},
 }
 
 ZONING_VALUE_RANGES = {
-    "Residential":  (150_000,   600_000),
-    "Commercial":   (800_000, 5_000_000),
-    "Industrial":   (500_000, 3_000_000),
-    "Agricultural":  (20_000,   200_000),
-    "Mixed-Use":    (300_000, 1_500_000),
-    "Conservation":  (10_000,   100_000),
+    "Residential": (150000, 600000),
+    "Commercial": (800000, 5000000),
+    "Industrial": (500000, 3000000),
+    "Agricultural": (200000, 200000),
+    "Mixed-Use": (300000, 1500000),
+    "Conservation": (10000, 100000),
 }
 
 ZONING_STATUS_WEIGHTS = {
-    "Residential":  ["Registered", "Registered", "Registered", "Pending",    "Disputed"],
-    "Commercial":   ["Registered", "Registered", "Registered", "Registered", "Pending"],
-    "Industrial":   ["Registered", "Registered", "Pending",    "Pending",    "Foreclosed"],
-    "Agricultural": ["Registered", "Pending",    "Disputed",   "Disputed",   "Registered"],
-    "Mixed-Use":    ["Registered", "Registered", "Pending",    "Disputed",   "Registered"],
-    "Conservation": ["Registered", "Registered", "Registered", "Pending",    "Registered"],
+    "Residential": ["Registered", "Registered", "Registered", "Pending", "Disputed"],
+    "Commercial": ["Registered", "Registered", "Registered", "Registered", "Pending"],
+    "Industrial": ["Registered", "Registered", "Pending", "Pending", "Foreclosed"],
+    "Agricultural": ["Registered", "Pending", "Disputed", "Disputed", "Registered"],
+    "Mixed-Use": ["Registered", "Registered", "Pending", "Disputed", "Registered"],
+    "Conservation": ["Registered", "Registered", "Registered", "Pending", "Registered"],
 }
 
 TELECOM_PROVIDERS = [
@@ -134,7 +134,7 @@ class AttributeGenerator:
                 break
         for field in schema:
             if field["name"] == "land_value_usd":
-                lo, hi = ZONING_VALUE_RANGES.get(zoning, (50_000, 500_000))
+                lo, hi = ZONING_VALUE_RANGES.get(zoning, (50000, 500000))
                 row["land_value_usd"] = round(rnd.uniform(lo, hi), 2)
                 break
         for field in schema:
@@ -179,7 +179,7 @@ class AttributeGenerator:
                 tower_type = rnd.choice(field.get("choices", ["Monopole", "Lattice", "Guyed Tower", "Stealth Tower", "Microcell"]))
                 row["tower_type"] = tower_type
                 break
-        
+
         if tower_type is None:
             tower_type = rnd.choice(["Monopole", "Lattice", "Guyed Tower", "Stealth Tower"])
             row["tower_type"] = tower_type
@@ -259,10 +259,10 @@ class AttributeGenerator:
         """
         rnd = random.Random(seed)
         correlated = {
-            "parcel":   AttributeGenerator._generate_parcel_row,
+            "parcel": AttributeGenerator._generate_parcel_row,
             "forestry": AttributeGenerator._generate_forestry_row,
-            "telecom":  AttributeGenerator._generate_telecom_row,
-            "utility":  AttributeGenerator._generate_utility_row,
+            "telecom": AttributeGenerator._generate_telecom_row,
+            "utility": AttributeGenerator._generate_utility_row,
         }
         gen_fn = correlated.get(template_hint)
         rows = []
@@ -272,5 +272,3 @@ class AttributeGenerator:
             else:
                 rows.append(AttributeGenerator.generate_row(i, rnd, schema))
         return rows
-
-

@@ -31,8 +31,9 @@ class GeometryGenerator:
             y = rnd.uniform(ymin, ymax)
             pt = QgsPointXY(x, y)
             if boundary_geom:
-                if not (bbox.xMinimum() <= x <= bbox.xMaximum() and
-                        bbox.yMinimum() <= y <= bbox.yMaximum()):
+                in_x_bound = bbox.xMinimum() <= x <= bbox.xMaximum()
+                in_y_bound = bbox.yMinimum() <= y <= bbox.yMaximum()
+                if not (in_x_bound and in_y_bound):
                     continue
                 if not boundary_geom.contains(QgsGeometry.fromPointXY(pt)):
                     continue
@@ -72,8 +73,9 @@ class GeometryGenerator:
             y = rnd.gauss(center.y(), stddev_y)
             pt = QgsPointXY(x, y)
             if boundary_geom:
-                if not (bbox.xMinimum() <= x <= bbox.xMaximum() and
-                        bbox.yMinimum() <= y <= bbox.yMaximum()):
+                in_x_bound = bbox.xMinimum() <= x <= bbox.xMaximum()
+                in_y_bound = bbox.yMinimum() <= y <= bbox.yMaximum()
+                if not (in_x_bound and in_y_bound):
                     continue
                 if not boundary_geom.contains(QgsGeometry.fromPointXY(pt)):
                     continue
@@ -106,8 +108,9 @@ class GeometryGenerator:
             if not (xmin <= pt.x() <= xmax and ymin <= pt.y() <= ymax):
                 return False
             if boundary_geom:
-                if not (bbox.xMinimum() <= pt.x() <= bbox.xMaximum() and
-                        bbox.yMinimum() <= pt.y() <= bbox.yMaximum()):
+                in_x_bound = bbox.xMinimum() <= pt.x() <= bbox.xMaximum()
+                in_y_bound = bbox.yMinimum() <= pt.y() <= bbox.yMaximum()
+                if not (in_x_bound and in_y_bound):
                     return False
                 if not boundary_geom.contains(QgsGeometry.fromPointXY(pt)):
                     return False
@@ -186,8 +189,9 @@ class GeometryGenerator:
             sy = rnd.uniform(ymin, ymax)
             pt = QgsPointXY(sx, sy)
             if boundary_geom:
-                if not (bbox.xMinimum() <= sx <= bbox.xMaximum() and
-                        bbox.yMinimum() <= sy <= bbox.yMaximum()):
+                in_x_bound = bbox.xMinimum() <= sx <= bbox.xMaximum()
+                in_y_bound = bbox.yMinimum() <= sy <= bbox.yMaximum()
+                if not (in_x_bound and in_y_bound):
                     continue
                 if not boundary_geom.contains(QgsGeometry.fromPointXY(pt)):
                     continue
@@ -200,8 +204,9 @@ class GeometryGenerator:
                 ny = curr_pt.y() + length * math.sin(angle)
                 next_pt = QgsPointXY(nx, ny)
                 if boundary_geom:
-                    if not (bbox.xMinimum() <= nx <= bbox.xMaximum() and
-                            bbox.yMinimum() <= ny <= bbox.yMaximum()):
+                    in_nx_bound = bbox.xMinimum() <= nx <= bbox.xMaximum()
+                    in_ny_bound = bbox.yMinimum() <= ny <= bbox.yMaximum()
+                    if not (in_nx_bound and in_ny_bound):
                         break
                     if not boundary_geom.contains(QgsGeometry.fromPointXY(next_pt)):
                         break
@@ -284,8 +289,9 @@ class GeometryGenerator:
             cy = rnd.uniform(ymin, ymax)
             center = QgsPointXY(cx, cy)
             if boundary_geom:
-                if not (bbox.xMinimum() <= cx <= bbox.xMaximum() and
-                        bbox.yMinimum() <= cy <= bbox.yMaximum()):
+                in_cx_bound = bbox.xMinimum() <= cx <= bbox.xMaximum()
+                in_cy_bound = bbox.yMinimum() <= cy <= bbox.yMaximum()
+                if not (in_cx_bound and in_cy_bound):
                     continue
                 if not boundary_geom.contains(QgsGeometry.fromPointXY(center)):
                     continue
@@ -352,8 +358,8 @@ class GeometryGenerator:
             if len(parcels) >= count:
                 break
             clipped = cell.intersection(clip_boundary)
-            if (not clipped.isEmpty() and clipped.isGeosValid()
-                    and clipped.type() == QgsWkbTypes.PolygonGeometry):
+            is_poly = clipped.type() == QgsWkbTypes.PolygonGeometry
+            if not clipped.isEmpty() and clipped.isGeosValid() and is_poly:
                 parcels.append(clipped)
         if len(parcels) < count:
             extra = count - len(parcels)

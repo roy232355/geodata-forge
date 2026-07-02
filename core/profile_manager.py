@@ -25,6 +25,7 @@ class ProfileManager:
             return True
         except Exception as e:
             raise IOError(f"Failed to write profile JSON: {str(e)}")
+
     @staticmethod
     def load_profile(file_path):
         """Loads configuration dictionary from a JSON file.

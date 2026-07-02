@@ -39,8 +39,8 @@ class Exporter:
     def _geom_type_to_wkb(geom_type_str):
         """Maps string geometry type to QgsWkbTypes enum."""
         mapping = {
-            "Point":   QgsWkbTypes.Point,
-            "Line":    QgsWkbTypes.LineString,
+            "Point": QgsWkbTypes.Point,
+            "Line": QgsWkbTypes.LineString,
             "Polygon": QgsWkbTypes.Polygon,
         }
         if geom_type_str not in mapping:

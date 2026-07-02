@@ -7,15 +7,6 @@ from .geometry_generator import GeometryGenerator
 from .attribute_generator import AttributeGenerator
 
 
-# -*- coding: utf-8 -*-
-"""QgsTask implementation for background thread execution of synthetic data generation."""
-from qgis.core import QgsTask, QgsGeometry, QgsPointXY
-from qgis.PyQt.QtCore import pyqtSignal
-
-from .geometry_generator import GeometryGenerator
-from .attribute_generator import AttributeGenerator
-
-
 class GenerationTask(QgsTask):
     """Asynchronously generates synthetic geometries and attributes.
 

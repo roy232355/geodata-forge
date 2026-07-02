@@ -1,0 +1,17 @@
+[general]
+name=GeoData Forge
+qgisMinimumVersion=3.28
+qgisMaximumVersion=4.99
+description=Generate repeatable synthetic geospatial datasets for testing, demos, QA, and privacy-safe sharing.
+version=1.0.0
+author=Rahul
+email=rahulmishak2323@gmail.com
+changelog=Initial release of GeoData Forge.
+experimental=False
+deprecated=False
+tags=synthetic,dummy,mock,test,generator,qa
+homepage=https://github.com/roy232355/geodata-forge
+tracker=https://github.com/roy232355/geodata-forge/issues
+repository=https://github.com/roy232355/geodata-forge
+icon=icon.png
+about=Generate repeatable synthetic geospatial datasets for testing, demos, QA, and privacy-safe sharing. Add templates for cadastral, utilities, telecom, and forestry with realistic data attributes.

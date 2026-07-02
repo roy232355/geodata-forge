@@ -264,7 +264,8 @@ class TestProfileManager(unittest.TestCase):
     """Verifies profile configuration loading size checks."""
 
     def setUp(self):
-        self.temp_file = tempfile.mktemp(suffix=".json")
+        fd, self.temp_file = tempfile.mkstemp(suffix=".json")
+        os.close(fd)
 
     def tearDown(self):
         if os.path.exists(self.temp_file):

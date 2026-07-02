@@ -17,7 +17,7 @@ class ProfileManager:
         """
         try:
             # Force metadata key
-            config["plugin_version"] = "1.0.0"
+            config["plugin_version"] = "1.0.1"
             config["software"] = "GeoData Forge"
 
             with open(file_path, "w", encoding="utf-8") as f:

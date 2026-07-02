@@ -3,7 +3,7 @@
 [![QGIS Compatibility](https://img.shields.io/badge/QGIS-3.28%20LTR%20%7C%203.x-brightgreen.svg)](https://qgis.org/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/Python-3.8%20%7C%203.12-blue.svg)](https://python.org/)
-[![Version](https://img.shields.io/badge/Release-v1.0.0-orange.svg)](https://github.com/roy232355/geodata-forge/releases)
+[![Version](https://img.shields.io/badge/Release-v1.0.1-orange.svg)](https://github.com/roy232355/geodata-forge/releases)
 
 GeoData Forge is a high-performance QGIS plugin designed to generate realistic synthetic vector datasets for testing, demonstrations, dashboards, machine learning, and education.
 

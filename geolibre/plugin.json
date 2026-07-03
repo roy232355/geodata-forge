@@ -1,0 +1,9 @@
+{
+  "id": "geodata-forge",
+  "name": "GeoData Forge",
+  "version": "1.0.0",
+  "description": "Generate repeatable synthetic geospatial datasets for testing, design layouts, and privacy-safe dashboarding.",
+  "entry": "index.js",
+  "style": "style.css",
+  "minGeoLibreVersion": "0.9.0"
+}

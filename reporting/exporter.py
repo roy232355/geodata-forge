@@ -138,21 +138,29 @@ class Exporter:
     @staticmethod
     def export_to_shapefile(output_path, layer_name, crs_authid, geom_type_str,
                             schema, features):
-        """Exports features to an ESRI Shapefile (.shp)."""
+        """Exports features to an ESRI Shapefile (.shp) using safe backup/restore pattern."""
         crs = QgsCoordinateReferenceSystem(crs_authid)
         if not crs.isValid():
             raise ValueError(f"Invalid Coordinate Reference System: {crs_authid}")
 
         geometry_type = Exporter._geom_type_to_wkb(geom_type_str)
 
-        # Shapefile field names: max 10 chars
+        # Shapefile field names: max 10 chars, bulletproof collision resolver
         truncated_schema = []
         seen_names = set()
         for field_def in schema:
             fd = dict(field_def)
             name = fd["name"][:10]
             if name in seen_names:
-                name = name[:8] + str(len(seen_names))
+                suffix_counter = 1
+                while True:
+                    suffix = str(suffix_counter)
+                    allowed_len = 10 - len(suffix)
+                    candidate_name = fd["name"][:allowed_len] + suffix
+                    if candidate_name not in seen_names:
+                        name = candidate_name
+                        break
+                    suffix_counter += 1
             seen_names.add(name)
             fd["_shp_name"] = name
             truncated_schema.append(fd)
@@ -170,13 +178,32 @@ class Exporter:
             fields.append(QgsField(field_def["_shp_name"], q_type))
 
         base = os.path.splitext(output_path)[0]
-        for ext in [".shp", ".shx", ".dbf", ".prj", ".cpg"]:
-            candidate = base + ext
-            if os.path.exists(candidate):
+        extensions = [".shp", ".shx", ".dbf", ".prj", ".cpg"]
+        bak_files = {}  # original_path -> bak_path
+
+        try:
+            for ext in extensions:
+                candidate = base + ext
+                if os.path.exists(candidate):
+                    bak_path = candidate + ".bak"
+                    if os.path.exists(bak_path):
+                        os.remove(bak_path)
+                    os.rename(candidate, bak_path)
+                    bak_files[candidate] = bak_path
+        except Exception as e:
+            # Rollback: restore any files we already renamed
+            for orig, bak in bak_files.items():
                 try:
-                    os.remove(candidate)
+                    if os.path.exists(orig):
+                        os.remove(orig)
+                    os.rename(bak, orig)
                 except Exception:
                     pass
+            raise IOError(
+                f"One or more shapefile components of '{os.path.basename(output_path)}' "
+                f"are currently in use or locked. Please remove the layer from the Layers panel "
+                f"and try again. (Detail: {str(e)})"
+            )
 
         options = QgsVectorFileWriter.SaveVectorOptions()
         options.driverName = "ESRI Shapefile"
@@ -190,8 +217,17 @@ class Exporter:
         )
         if writer is None or writer.hasError() != QgsVectorFileWriter.NoError:
             err_msg = writer.errorMessage() if writer else "Initialization Error"
+            # Rollback: restore backups
+            for orig, bak in bak_files.items():
+                try:
+                    if os.path.exists(orig):
+                        os.remove(orig)
+                    os.rename(bak, orig)
+                except Exception:
+                    pass
             raise IOError(f"Failed to create Shapefile writer: {err_msg}")
 
+        writer_deleted = False
         try:
             for geom, attribs in features:
                 if geom is None or geom.isEmpty():
@@ -202,8 +238,28 @@ class Exporter:
                     orig_name = field_def["name"]
                     feature.setAttribute(i, attribs.get(orig_name))
                 writer.addFeature(feature)
-        finally:
+        except Exception as e:
             del writer
+            writer_deleted = True
+            for orig, bak in bak_files.items():
+                try:
+                    if os.path.exists(orig):
+                        os.remove(orig)
+                    os.rename(bak, orig)
+                except Exception:
+                    pass
+            raise e
+        finally:
+            if not writer_deleted:
+                del writer
+
+        # Success: clean up backups
+        for bak in bak_files.values():
+            if os.path.exists(bak):
+                try:
+                    os.remove(bak)
+                except Exception:
+                    pass
         return True
 
     @staticmethod

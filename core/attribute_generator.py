@@ -27,7 +27,7 @@ ZONING_VALUE_RANGES = {
     "Residential": (150000, 600000),
     "Commercial": (800000, 5000000),
     "Industrial": (500000, 3000000),
-    "Agricultural": (200000, 200000),
+    "Agricultural": (20000, 200000),
     "Mixed-Use": (300000, 1500000),
     "Conservation": (10000, 100000),
 }
@@ -176,7 +176,8 @@ class AttributeGenerator:
         tower_type = None
         for field in schema:
             if field["name"] == "tower_type":
-                tower_type = rnd.choice(field.get("choices", ["Monopole", "Lattice", "Guyed Tower", "Stealth Tower", "Microcell"]))
+                choices = field.get("choices", ["Monopole", "Lattice", "Guyed Tower", "Stealth Tower", "Microcell"])
+                tower_type = rnd.choice(choices)
                 row["tower_type"] = tower_type
                 break
 
@@ -226,7 +227,7 @@ class AttributeGenerator:
         for field in schema:
             if field["name"] == "flow_status":
                 if install_year is not None:
-                    age = 2026 - install_year
+                    age = datetime.date.today().year - install_year
                     if age > 25:
                         choices = ["Maintenance", "Maintenance", "Leak Detected",
                                    "Restricted", "Flowing"]

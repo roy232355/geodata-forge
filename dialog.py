@@ -36,9 +36,11 @@ from qgis.core import (
 )
 from qgis.gui import QgsCollapsibleGroupBox
 
+from .core import FORGE_VERSION
 from .core.task_runner import GenerationTask
 from .core.profile_manager import ProfileManager
 from .core.validator import Validator
+from .core.geometry_generator import GeometryGenerator
 from .reporting.exporter import Exporter
 
 
@@ -134,7 +136,7 @@ class GeoDataForgeDialog(QDialog):
         title_layout = QHBoxLayout()
         title_lbl = QLabel("GeoData Forge")
         title_lbl.setStyleSheet("font-size: 16px; font-weight: bold; color: #1E3A8A;")
-        version_lbl = QLabel("v1.0.0")
+        version_lbl = QLabel(f"v{FORGE_VERSION}")
         version_lbl.setStyleSheet("font-weight: bold; color: #94A3B8; font-size: 11px;")
         title_layout.addWidget(title_lbl)
         title_layout.addStretch()
@@ -373,6 +375,11 @@ class GeoDataForgeDialog(QDialog):
         self.btn_copy_geojson.clicked.connect(self.run_copy_geojson)
 
         self.btn_export_script = QPushButton("Export Script")
+        self.btn_export_script.setToolTip(
+            "Export a standalone Python script to generate a basic uniform random "
+            "distribution of points (Line/Polygon geometries are exported using simple "
+            "rectangular box buffers)."
+        )
         self.btn_export_script.clicked.connect(self.run_export_script)
 
         row1_layout.addWidget(self.btn_preview)
@@ -426,17 +433,42 @@ class GeoDataForgeDialog(QDialog):
         self.chk_err_outliers.setEnabled(enabled)
 
     def on_geom_type_changed(self):
-        """Updates output file name default layer extension dynamically."""
+        """Updates output file name default layer extension and distribution labels dynamically."""
         geom_type = self.selected_geom_type
+
+        self.dist_combo.blockSignals(True)
+        current_idx = self.dist_combo.currentIndex()
+        self.dist_combo.clear()
+
         if geom_type == "Point":
             self.layer_name_edit.setText("synthetic_points")
             self.spacing_spin.setEnabled(True)
+            self.dist_combo.addItems([
+                "🎲 Uniform Distribution",
+                "🎯 Gaussian Clustered",
+                "📏 Poisson Disc (Spacing)"
+            ])
         elif geom_type == "Line":
             self.layer_name_edit.setText("synthetic_lines")
             self.spacing_spin.setEnabled(False)
+            self.dist_combo.addItems([
+                "🎲 Random Paths (Uniform)",
+                "🕸️ MST Network (Gaussian)",
+                "🕸️ MST Network (Poisson)"
+            ])
         elif geom_type == "Polygon":
             self.layer_name_edit.setText("synthetic_polygons")
             self.spacing_spin.setEnabled(False)
+            self.dist_combo.addItems([
+                "🎲 Star Polygons (Uniform)",
+                "⬡ Voronoi Parcels (Gaussian)",
+                "⬡ Voronoi Parcels (Poisson)"
+            ])
+
+        self.dist_combo.setCurrentIndex(current_idx if current_idx < self.dist_combo.count() else 0)
+        self.dist_combo.blockSignals(False)
+
+        self.toggle_dist_inputs()
         self.update_output_extension()
 
     def on_format_changed(self):
@@ -866,27 +898,41 @@ class GeoDataForgeDialog(QDialog):
 
             if geom_type == "Point":
                 geom_uri = f"Point?crs={crs_str}"
-                from .core.geometry_generator import GeometryGenerator
                 if dist == "Poisson Disc (Spacing)":
-                    geometries = [QgsGeometry.fromPointXY(p) for p in GeometryGenerator.generate_poisson_disc_points(xmin, ymin, xmax, ymax, count, seed, spacing, boundary_geom)]
+                    raw_pts = GeometryGenerator.generate_poisson_disc_points(
+                        xmin, ymin, xmax, ymax, count, seed, spacing, boundary_geom
+                    )
+                    geometries = [QgsGeometry.fromPointXY(p) for p in raw_pts]
                 elif dist == "Gaussian Clustered":
-                    geometries = [QgsGeometry.fromPointXY(p) for p in GeometryGenerator.generate_clustered_points(xmin, ymin, xmax, ymax, count, seed, boundary_geom)]
+                    raw_pts = GeometryGenerator.generate_clustered_points(
+                        xmin, ymin, xmax, ymax, count, seed, boundary_geom
+                    )
+                    geometries = [QgsGeometry.fromPointXY(p) for p in raw_pts]
                 else:
-                    geometries = [QgsGeometry.fromPointXY(p) for p in GeometryGenerator.generate_uniform_points(xmin, ymin, xmax, ymax, count, seed, boundary_geom)]
+                    raw_pts = GeometryGenerator.generate_uniform_points(
+                        xmin, ymin, xmax, ymax, count, seed, boundary_geom
+                    )
+                    geometries = [QgsGeometry.fromPointXY(p) for p in raw_pts]
             elif geom_type == "Line":
                 geom_uri = f"LineString?crs={crs_str}"
-                from .core.geometry_generator import GeometryGenerator
                 if dist in ("Gaussian Clustered", "Poisson Disc (Spacing)"):
-                    geometries = GeometryGenerator.generate_mst_networks(xmin, ymin, xmax, ymax, count, seed, boundary_geom)
+                    geometries = GeometryGenerator.generate_mst_networks(
+                        xmin, ymin, xmax, ymax, count, seed, boundary_geom
+                    )
                 else:
-                    geometries = GeometryGenerator.generate_random_paths(xmin, ymin, xmax, ymax, count, seed, boundary_geom)
+                    geometries = GeometryGenerator.generate_random_paths(
+                        xmin, ymin, xmax, ymax, count, seed, boundary_geom
+                    )
             elif geom_type == "Polygon":
                 geom_uri = f"Polygon?crs={crs_str}"
-                from .core.geometry_generator import GeometryGenerator
                 if dist in ("Gaussian Clustered", "Poisson Disc (Spacing)"):
-                    geometries = GeometryGenerator.generate_voronoi_parcels(xmin, ymin, xmax, ymax, count, seed, boundary_geom)
+                    geometries = GeometryGenerator.generate_voronoi_parcels(
+                        xmin, ymin, xmax, ymax, count, seed, boundary_geom
+                    )
                 else:
-                    geometries = GeometryGenerator.generate_star_polygons(xmin, ymin, xmax, ymax, count, seed, boundary_geom)
+                    geometries = GeometryGenerator.generate_star_polygons(
+                        xmin, ymin, xmax, ymax, count, seed, boundary_geom
+                    )
             else:
                 raise ValueError(f"Unsupported geometry preview type: {geom_type}")
 
@@ -1134,7 +1180,7 @@ class GeoDataForgeDialog(QDialog):
 
 Description:
 Synthetic dataset containing {len(features)} {geom_type} features generated within the selected boundary extent.
-Generated by GeoData Forge (v1.0.1).
+Generated by GeoData Forge (v{FORGE_VERSION}).
 
 Parameters:
 • Random Seed: {self.seed_spin.value()}
@@ -1152,25 +1198,97 @@ Generated Schema Fields:
                 rf.write(readme_content)
 
             # 2. Write HTML report
-            breakdown_rows = "".join([f"<tr><td>{k}</td><td><b>{v}/25</b></td></tr>" for k, v in breakdown.items()])
+            max_scores = {
+                "Geometry valid": 25,
+                "No duplicate IDs": 20,
+                "No unexpected NULLs": 20,
+                "Feature count match": 15,
+                "Attribute completeness": 10,
+                "CRS valid": 10
+            }
+            breakdown_rows = "".join([
+                f"<tr><td>{k}</td><td><b>{v}/{max_scores.get(k, 25)}</b></td></tr>"
+                for k, v in breakdown.items()
+            ])
             html_content = f"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <title>GeoData Forge - Generation Report</title>
     <style>
-        body {{ font-family: 'Segoe UI', system-ui, sans-serif; margin: 30px; background-color: #F8FAFC; color: #1E293B; }}
-        .card {{ background: #FFFFFF; padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 650px; margin: auto; border: 1px solid #E2E8F0; }}
-        h1 {{ color: #1E3A8A; font-size: 22px; border-bottom: 2px solid #E2E8F0; padding-bottom: 10px; margin-top: 0; }}
-        .metric-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }}
-        .metric {{ background: #F1F5F9; padding: 12px; border-radius: 6px; border-left: 4px solid #3B82F6; }}
-        .metric span {{ display: block; font-size: 11px; color: #64748B; text-transform: uppercase; font-weight: bold; }}
-        .metric b {{ font-size: 16px; color: #0F172A; }}
-        .score {{ text-align: center; background: #ECFDF5; border: 1px solid #10B981; padding: 15px; border-radius: 6px; margin: 20px 0; }}
-        .score-val {{ font-size: 32px; font-weight: bold; color: #059669; }}
-        table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }}
-        th, td {{ padding: 10px; text-align: left; border-bottom: 1px solid #E2E8F0; }}
-        th {{ background-color: #F8FAFC; color: #64748B; font-size: 12px; }}
+        body {{
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 30px;
+            background-color: #F8FAFC;
+            color: #1E293B;
+        }}
+        .card {{
+            background: #FFFFFF;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            max-width: 650px;
+            margin: auto;
+            border: 1px solid #E2E8F0;
+        }}
+        h1 {{
+            color: #1E3A8A;
+            font-size: 22px;
+            border-bottom: 2px solid #E2E8F0;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }}
+        .metric-grid {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }}
+        .metric {{
+            background: #F1F5F9;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid #3B82F6;
+        }}
+        .metric span {{
+            display: block;
+            font-size: 11px;
+            color: #64748B;
+            text-transform: uppercase;
+            font-weight: bold;
+        }}
+        .metric b {{
+            font-size: 16px;
+            color: #0F172A;
+        }}
+        .score {{
+            text-align: center;
+            background: #ECFDF5;
+            border: 1px solid #10B981;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }}
+        .score-val {{
+            font-size: 32px;
+            font-weight: bold;
+            color: #059669;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }}
+        th, td {{
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #E2E8F0;
+        }}
+        th {{
+            background-color: #F8FAFC;
+            color: #64748B;
+            font-size: 12px;
+        }}
     </style>
 </head>
 <body>
@@ -1192,14 +1310,14 @@ Generated Schema Fields:
         <h2>Validation Breakdown</h2>
         <table>
             <thead>
-                <tr><th>Audit Metric</th><th>Scoring weight</th></tr>
+                <tr><th>Audit Metric</th><th>Points Earned</th></tr>
             </thead>
             <tbody>
                 {breakdown_rows}
             </tbody>
         </table>
         <p style="font-size: 11px; color: #94A3B8; text-align: center; margin-top: 25px;">
-            Generated by GeoData Forge Plugin v1.0.0. All rights reserved.
+            Generated by GeoData Forge Plugin v{FORGE_VERSION}. All rights reserved.
         </p>
     </div>
 </body>
@@ -1338,15 +1456,22 @@ Generated Schema Fields:
             script_template = f'''# -*- coding: utf-8 -*-
 """
 Standalone Synthetic Spatial Data Generator Script
-Generated by GeoData Forge (v1.0.1)
+Generated by GeoData Forge (v{FORGE_VERSION})
 
-This script generates synthetic spatial features (GeoJSON) matching your schema.
+Note: This standalone script generates a simplified version of your dataset.
+It uses a basic uniform random distribution to generate point coordinates.
+For Line/Polygon geometries, it generates simple rectangular box buffers around
+the generated point coordinates. Advanced spatial distributions (Poisson, Gaussian,
+MST, Voronoi) and domain-correlated attribute rules are not supported in this
+standalone CLI exporter.
+
 Run this script from any command-line environment:
     python {os.path.basename(path)}
 """
 import json
 import random
 import math
+import datetime
 
 # Configuration Parameters
 GEOM_TYPE = {repr(geom_type)}
@@ -1395,7 +1520,18 @@ def generate_attributes():
                 v_max = field.get("max", 100)
                 row[name] = round(rnd.uniform(v_min, v_max), 2)
             elif ftype == "Date":
-                row[name] = f"2026-07-{{rnd.randint(1, 28):02d}}"
+                start_year = field.get("start_year", 2015)
+                end_year = field.get("end_year", 2026)
+                start_dt = datetime.datetime(start_year, 1, 1)
+                end_dt = datetime.datetime(end_year, 12, 31)
+                delta_seconds = int((end_dt - start_dt).total_seconds())
+                offset = rnd.randint(0, delta_seconds)
+                target_dt = start_dt + datetime.timedelta(seconds=offset)
+                row[name] = target_dt.strftime("%Y-%m-%d")
+            elif ftype == "Year":
+                start_year = field.get("start_year", 1990)
+                end_year = field.get("end_year", 2024)
+                row[name] = rnd.randint(start_year, end_year)
             elif ftype == "Status":
                 choices = field.get("choices", ["Active", "Planned", "Maintenance"])
                 row[name] = rnd.choice(choices)

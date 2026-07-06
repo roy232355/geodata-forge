@@ -3,6 +3,8 @@
 import json
 import os
 
+from . import FORGE_VERSION
+
 
 class ProfileManager:
     """Handles saving and loading generation parameters configuration profiles to/from JSON."""
@@ -17,7 +19,7 @@ class ProfileManager:
         """
         try:
             # Force metadata key
-            config["plugin_version"] = "1.0.1"
+            config["plugin_version"] = FORGE_VERSION
             config["software"] = "GeoData Forge"
 
             with open(file_path, "w", encoding="utf-8") as f:

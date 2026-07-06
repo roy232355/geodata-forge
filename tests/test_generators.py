@@ -371,6 +371,46 @@ class TestExporter(unittest.TestCase):
             self.assertEqual(data["type"], "FeatureCollection")
             self.assertEqual(len(data["features"]), 1)
 
+    def test_shapefile_field_name_truncation(self):
+        path = os.path.join(self.temp_dir, "test.shp")
+        # 12 fields all having same prefix of length > 8
+        schema = [{"name": f"very_long_name_{i}", "type": "Numeric"} for i in range(12)]
+        features = [(MockGeometry(None), {f"very_long_name_{i}": i}) for i in range(5)]
+
+        # Should execute successfully without throwing duplicate name errors
+        success = Exporter.export_to_shapefile(path, "test_layer", "EPSG:4326", "Point", schema, features)
+        self.assertTrue(success)
+
+    def test_shapefile_safe_backup_restore_on_failure(self):
+        path = os.path.join(self.temp_dir, "test_failure.shp")
+
+        # Pre-create candidate shapefile components
+        extensions = [".shp", ".shx", ".dbf", ".prj", ".cpg"]
+        base = os.path.splitext(path)[0]
+        for ext in extensions:
+            with open(base + ext, "w") as f:
+                f.write(f"original {ext} content")
+
+        schema = [{"name": "id", "type": "SequentialID"}]
+        features = [(MockGeometry(None), {"id": 1})]
+
+        # Force a failure by using an invalid CRS
+        with self.assertRaises(ValueError):
+            Exporter.export_to_shapefile(path, "test_layer", "INVALID_CRS", "Point", schema, features)
+
+        # Verify that all original files were restored and backup files cleaned up
+        for ext in extensions:
+            candidate = base + ext
+            self.assertTrue(os.path.exists(candidate))
+            with open(candidate, "r") as f:
+                self.assertEqual(f.read(), f"original {ext} content")
+            self.assertFalse(os.path.exists(candidate + ".bak"))
+
+    def test_forge_version_loading(self):
+        from core import FORGE_VERSION
+        self.assertIsNotNone(FORGE_VERSION)
+        self.assertNotEqual(FORGE_VERSION, "Unknown")
+
 
 if __name__ == "__main__":
     unittest.main()

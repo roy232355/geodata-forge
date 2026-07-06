@@ -1428,10 +1428,10 @@ Generated Schema Fields:
     @property
     def selected_distribution(self) -> str:
         """Returns clean distribution string ('Uniform', 'Gaussian Clustered', 'Poisson Disc (Spacing)')."""
-        raw = self.dist_combo.currentText()
-        if "Clustered" in raw:
+        idx = self.dist_combo.currentIndex()
+        if idx == 1:
             return "Gaussian Clustered"
-        if "Poisson" in raw:
+        if idx == 2:
             return "Poisson Disc (Spacing)"
         return "Uniform"
 

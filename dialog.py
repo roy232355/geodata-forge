@@ -298,6 +298,19 @@ class GeoDataForgeDialog(QDialog):
         error_layout.addWidget(self.chk_err_nulls)
         error_layout.addWidget(self.chk_err_outliers)
 
+        # GeoQA Benchmark Manifest — new in this release
+        self.chk_export_manifest = QCheckBox("📋 Export GeoQA Benchmark Manifest (known-answer test)")
+        self.chk_export_manifest.setChecked(True)
+        self.chk_export_manifest.setEnabled(False)
+        self.chk_export_manifest.setToolTip(
+            "Writes a companion *_geoqa_manifest.json / .txt file listing exactly which\n"
+            "GeoQA rule IDs (e.g. G001, G004, A005, A007) this dataset is expected to\n"
+            "trigger, and on which feature IDs. Run the exported dataset through GeoQA\n"
+            "and compare its report against this manifest as a quick regression/sanity\n"
+            "check that GeoQA (or any QA tool) is still catching what it should."
+        )
+        error_layout.addWidget(self.chk_export_manifest)
+
         # Reproducible Random Seed
         seed_layout = QHBoxLayout()
         seed_label = QLabel("Reproducible Random Seed:")
@@ -431,6 +444,7 @@ class GeoDataForgeDialog(QDialog):
         self.chk_err_dup_ids.setEnabled(enabled)
         self.chk_err_nulls.setEnabled(enabled)
         self.chk_err_outliers.setEnabled(enabled)
+        self.chk_export_manifest.setEnabled(enabled)
 
     def on_geom_type_changed(self):
         """Updates output file name default layer extension and distribution labels dynamically."""
@@ -793,6 +807,7 @@ class GeoDataForgeDialog(QDialog):
             "err_dup_ids": self.chk_err_dup_ids.isChecked(),
             "err_nulls": self.chk_err_nulls.isChecked(),
             "err_outliers": self.chk_err_outliers.isChecked(),
+            "export_geoqa_manifest": self.chk_export_manifest.isChecked(),
             "output_format_index": self.format_combo.currentIndex(),
             "output_path": self.path_edit.text(),
             "layer_name": self.layer_name_edit.text()
@@ -843,6 +858,7 @@ class GeoDataForgeDialog(QDialog):
             self.chk_err_dup_ids.setChecked(config.get("err_dup_ids", False))
             self.chk_err_nulls.setChecked(config.get("err_nulls", False))
             self.chk_err_outliers.setChecked(config.get("err_outliers", False))
+            self.chk_export_manifest.setChecked(config.get("export_geoqa_manifest", True))
 
             if "output_format_index" in config:
                 self.format_combo.setCurrentIndex(config["output_format_index"])
@@ -1082,6 +1098,146 @@ class GeoDataForgeDialog(QDialog):
             self.log("Generation canceled by user.")
             self.is_copy_geojson = False
             self.reset_button_states()
+
+    def build_benchmark_manifest(self, error_settings, feature_count, geom_type, fmt_idx):
+        """Builds a list of expected QA-tool findings for this generated dataset.
+
+        Mirrors the deterministic error-injection logic in
+        ``core/task_runner.py::GenerationTask.run`` exactly: that method only
+        injects errors when ``len(geometries) > 2 and len(rows) > 2``, and
+        always targets feature index 0, 1, or the last index. FIDs below
+        assume a freshly written, freshly reloaded layer (GPKG/Shapefile/
+        GeoJSON all number sequentially from 1 in that case). Geometry-based
+        expectations are omitted for CSV output, since CSV export drops
+        geometry entirely and a geometry rule can't fire against it.
+        """
+        if feature_count <= 2:
+            return []
+
+        is_csv = (fmt_idx == 3)
+        last_fid = feature_count
+        expectations = []
+
+        if error_settings.get("inject_duplicate_geoms") and not is_csv:
+            expectations.append({
+                "geoqa_rule_id": "G004",
+                "geoqa_rule_name": "Duplicate Geometry",
+                "expected_issue_count": 1,
+                "affected_fids": [1, 2],
+                "description": "Feature 2's geometry was set to an exact duplicate of feature 1's.",
+            })
+
+        if error_settings.get("inject_self_intersections") and geom_type in ("Line", "Polygon") and not is_csv:
+            shape = "self-intersecting linestring" if geom_type == "Line" else "self-intersecting polygon ring"
+            expectations.append({
+                "geoqa_rule_id": "G001",
+                "geoqa_rule_name": "Invalid Geometry",
+                "expected_issue_count": 1,
+                "affected_fids": [1],
+                "description": f"Feature 1's geometry was replaced with a {shape}.",
+            })
+
+        if error_settings.get("inject_slivers") and geom_type == "Polygon" and not is_csv:
+            expectations.append({
+                "geoqa_rule_id": "G005",
+                "geoqa_rule_name": "Sliver Polygons",
+                "expected_issue_count": 1,
+                "affected_fids": [last_fid],
+                "description": (
+                    f"The last feature (FID {last_fid}) was replaced with a degenerate, "
+                    "near-zero-area sliver triangle."
+                ),
+            })
+
+        if error_settings.get("inject_duplicate_ids"):
+            expectations.append({
+                "geoqa_rule_id": "A005",
+                "geoqa_rule_name": "Duplicate Identifiers",
+                "expected_issue_count": 1,
+                "affected_fids": [1, 2],
+                "description": "Feature 2's ID field was overwritten to match feature 1's ID value.",
+            })
+
+        if error_settings.get("inject_nulls"):
+            expectations.append({
+                "geoqa_rule_id": "A003",
+                "geoqa_rule_name": "Null Values",
+                "expected_issue_count": 1,
+                "affected_fids": [1, 2],
+                "description": (
+                    "A text field (name/class/category/status/material/species/provider) "
+                    "was set to NULL on features 1 and 2."
+                ),
+            })
+
+        if error_settings.get("inject_outliers"):
+            expectations.append({
+                "geoqa_rule_id": "A007",
+                "geoqa_rule_name": "Statistical Outliers",
+                "expected_issue_count": 1,
+                "affected_fids": [1],
+                "description": (
+                    "A numeric field on feature 1 was set to an extreme outlier "
+                    "(abs(original_value) * 100 + 999)."
+                ),
+            })
+
+        return expectations
+
+    def write_benchmark_manifest(self, base_dir, base_name, layer_name, output_path,
+                                 expectations, feature_count, geom_type, crs_str, score):
+        """Writes the companion GeoQA benchmark manifest (.json + .txt) to disk."""
+        import json
+
+        manifest = {
+            "generated_by": f"GeoData Forge v{FORGE_VERSION}",
+            "dataset_layer_name": layer_name,
+            "dataset_path": output_path,
+            "feature_count": feature_count,
+            "geometry_type": geom_type,
+            "crs": crs_str,
+            "generation_quality_score": score,
+            "expected_geoqa_findings": expectations,
+            "notes": (
+                "This manifest lists the QA rule violations intentionally injected into "
+                "this dataset. Run it through GeoQA (or another QA tool) and confirm each "
+                "rule_id below is reported at least once on the listed feature IDs. FIDs "
+                "assume the layer is freshly written/reloaded and features are numbered "
+                "sequentially from 1 in generation order."
+            ),
+        }
+
+        json_path = os.path.join(base_dir, f"{base_name}_geoqa_manifest.json")
+        with open(json_path, "w", encoding="utf-8") as jf:
+            json.dump(manifest, jf, indent=2)
+
+        txt_lines = [
+            "GeoData Forge — GeoQA Benchmark Manifest",
+            "=" * 42,
+            f"Dataset: {layer_name}  ({feature_count} {geom_type} features, {crs_str})",
+            "",
+            "Expected QA findings:",
+        ]
+        if expectations:
+            for exp in expectations:
+                fids = ", ".join(str(f) for f in exp["affected_fids"])
+                txt_lines.append(
+                    f"  • {exp['geoqa_rule_id']} ({exp['geoqa_rule_name']}) "
+                    f"— {exp['expected_issue_count']} issue(s) on FID(s) {fids}"
+                )
+                txt_lines.append(f"      {exp['description']}")
+        else:
+            txt_lines.append("  (No error types were enabled/applicable for this run.)")
+        txt_lines.append("")
+        txt_lines.append(
+            "Run this dataset through GeoQA and compare its report against the list "
+            "above to confirm expected rules are still firing correctly."
+        )
+        txt_path = os.path.join(base_dir, f"{base_name}_geoqa_manifest.txt")
+        with open(txt_path, "w", encoding="utf-8") as tf:
+            tf.write("\n".join(txt_lines))
+
+        return json_path, txt_path
 
     def on_generation_completed(self, features):
         """Writes thread results to output format and loads it to project."""
@@ -1329,6 +1485,34 @@ Generated Schema Fields:
             self.log(f"SUCCESS: Report saved to {os.path.basename(report_path)}")
             self.log(f"SUCCESS: Dataset description readme saved to {os.path.basename(readme_path)}")
 
+            # 3. GeoQA Benchmark Manifest — only meaningful when errors were intentionally injected
+            manifest_line = ""
+            if self.chk_enable_errors.isChecked() and self.chk_export_manifest.isChecked():
+                error_settings = {
+                    "inject_duplicate_geoms": self.chk_err_dup_geom.isChecked(),
+                    "inject_self_intersections": self.chk_err_self_intersect.isChecked(),
+                    "inject_slivers": self.chk_err_slivers.isChecked(),
+                    "inject_duplicate_ids": self.chk_err_dup_ids.isChecked(),
+                    "inject_nulls": self.chk_err_nulls.isChecked(),
+                    "inject_outliers": self.chk_err_outliers.isChecked(),
+                }
+                expectations = self.build_benchmark_manifest(
+                    error_settings, len(features), geom_type, fmt_idx
+                )
+                if expectations:
+                    _, manifest_txt_path = self.write_benchmark_manifest(
+                        base_dir, base_name, layer_name, output_path,
+                        expectations, len(features), geom_type, crs_str, score
+                    )
+                    rule_ids = ", ".join(e["geoqa_rule_id"] for e in expectations)
+                    self.log(
+                        f"SUCCESS: GeoQA benchmark manifest saved to "
+                        f"{os.path.basename(manifest_txt_path)} — expects {rule_ids}"
+                    )
+                    manifest_line = (
+                        f"• <b>GeoQA Benchmark Manifest:</b> expects {rule_ids}<br>"
+                    )
+
             # Formulate breakdown message
             breakdown_lines = "<br>".join([f"  • {k}: {v} pts" for k, v in breakdown.items()])
             summary_msg = (
@@ -1337,6 +1521,7 @@ Generated Schema Fields:
                 f"• <b>Attributes Compiled:</b> {len(schema)} fields<br>"
                 f"• <b>Data Format:</b> {fmt_desc}<br>"
                 f"• <b>Quality Score:</b> {score}/100<br>"
+                f"{manifest_line}"
                 f"• <b>Validation Audit Metrics:</b><br>{breakdown_lines}<br><br>"
                 f"<i>HTML Report & README explanation files created successfully!</i>"
             )
@@ -1427,7 +1612,16 @@ Generated Schema Fields:
 
     @property
     def selected_distribution(self) -> str:
-        """Returns clean distribution string ('Uniform', 'Gaussian Clustered', 'Poisson Disc (Spacing)')."""
+        """Returns clean internal distribution key for the current selection.
+
+        The combo box's visible labels are re-populated per geometry type in
+        ``on_geom_type_changed`` (e.g. "MST Network (Gaussian)" for Line,
+        "Voronoi Parcels (Gaussian)" for Polygon) so they no longer reliably
+        contain the words "Clustered"/"Poisson". Matching by index instead
+        keeps this in sync with task_runner.py's dispatch, which only cares
+        about position 0 (Uniform-style) vs 1 (Gaussian-style) vs 2
+        (Poisson-style) regardless of the label text shown to the user.
+        """
         idx = self.dist_combo.currentIndex()
         if idx == 1:
             return "Gaussian Clustered"

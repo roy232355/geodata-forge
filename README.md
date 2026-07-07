@@ -25,7 +25,8 @@ Instead of generating simple random shapes, GeoData Forge generates **domain-awa
 * **QGIS Map Canvas Live Preview**: Renders temporary memory preview layers in a single click before exporting features.
 * **Profile Configuration Manager**: Saves and loads all GUI parameters to reusable `.json` files.
 * **QA Error Injection Mode**: Intentionally injects invalid geometries, self-intersections, slivers, duplicate IDs, outliers, or NULL fields to benchmark validation software like **GeoQA**.
-* **Automation Automation Exporter**: Generates a zero-dependency standalone Python script (`.py`) to replicate the configuration and generate matching GeoJSON features outside of QGIS.
+* **GeoQA Benchmark Manifest** *(new)*: When error injection is enabled, optionally exports a companion `*_geoqa_manifest.json` / `.txt` file listing exactly which GeoQA rule IDs (e.g. `G001`, `G004`, `A005`, `A007`) and feature IDs the injected errors are expected to trigger — a known-answer regression test you can run after every GeoQA update to confirm it still catches what it should.
+* **Automation Exporter**: Generates a zero-dependency standalone Python script (`.py`) to replicate a simplified (uniform-distribution) version of the configuration outside of QGIS.
 * **Telemetry Diagnostics Dashboard**: Generates structured HTML Quality Reports and explainer README files next to output files.
 
 ---
